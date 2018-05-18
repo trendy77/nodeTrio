@@ -31,26 +31,28 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
 #include <ArduinoOTA.h>
+#include <Wire.h>  // Only needed for Arduino 1.6.5 and earlier
+#include "SSD1306Wire.h" // legacy include: `#include "SSD1306.h"`
 
 String local_ip = "";
-char* device_id = "nano1";
 IPAddress subnet(255, 255, 255, 0);
 IPAddress ip(10, 0, 77, 151);
 IPAddress gateway(10, 0, 77, 100);
 const char ssid[] = "Northern Frontier Interwebs";
 const char pass[] = "num4jkha8nnk";
+const char* device_id = "nano1";
 
-
-#include <Wire.h>  // Only needed for Arduino 1.6.5 and earlier
-#include "SSD1306Wire.h" // legacy include: `#include "SSD1306.h"`
-
-// Initialize the OLED display using Wire library
 SSD1306Wire  display(0x3c, 5,4);
+int ldrPin = D6;
 
-int scrNum = 0;
-long theTime, lastTime = 0;
+long lux = 0;						// lux
+long percentLux = map(lux, 0, 1023, 0, 100);
+int scrNum = 0;						// screen var
+long theTime, lastTime = 0;			// timing vars
 
-
+void checkLux() {
+	lux = analogRead(ldrPin);
+}
 
 void drawLines() {
 	for (int16_t i = 0; i<display.getWidth(); i += 4) {
@@ -150,6 +152,42 @@ void drawCircle(void) {
 	delay(200);
 	display.drawCircleQuads(display.getWidth() / 2, display.getHeight() / 2, display.getHeight() / 4, 0b00001111);
 	display.display();
+	delay(100);
+
+}
+
+void fillCircle(int howMuch) {
+	if (howMuch <= 25) {
+		return;
+	}
+	if ((howMuch>25)&&(howMuch<=50)) {
+		display.fillCircle(display.getWidth() / 2, display.getHeight() / 2, 0b00000001);
+		display.display();
+		delay(200);
+		return;
+	}
+	if ((howMuch>50) && (howMuch <= 75)) {
+		display.fillCircle(display.getWidth() / 2, display.getHeight() / 2, 0b00000001);
+		display.display();
+		delay(200);
+		return;
+	}
+	if ((howMuch>75) && (howMuch <= 100)) {
+		display.fillCircle(display.getWidth() / 2, display.getHeight() / 2, 0b00000001);
+		display.display();
+		delay(200);
+		return;
+	}
+}
+
+void luxCircle() {
+	fillCircle(percentLux);
+	
+	display.setTextAlignment(TEXT_ALIGN_RIGHT);
+	display.setFont(ArialMT_Plain_10);
+	display.drawString(display.getWidth() / 3, display.getHeight() / 3,"lux:");
+	display.drawString(display.getWidth() / (2/3), display.getHeight() / (2/3), String(percentLux));
+	display.display();
 }
 
 String showScreen() {
@@ -215,19 +253,23 @@ String ipToString(IPAddress address){
 void setup() {
 	Serial.begin(115200); 
 	Serial.print("Starting WIFI");
+
 	display.init();
 	display.flipScreenVertically();
 	display.setContrast(255);
 
-	typeDis("Starting WiFi");
-	
+	typeDis("Starting Debug");
+	Serial1.begin(115200);
+	Serial1.print("Starting WIFI");
+
 	WiFi.config(ip, gateway, subnet);
 	WiFi.begin(ssid, pass);
 	while (WiFi.status() != WL_CONNECTED) {
 		delay(10);
 	}
-	typeDis("Connected to " + Wi);
 	local_ip = ipToString(WiFi.localIP());
+	typeDis("Connected to IP " + local_ip);
+	
 
 	ArduinoOTA.begin();
 	ArduinoOTA.onStart([]() {
